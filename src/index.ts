@@ -1,6 +1,8 @@
 import express, { Request, Response } from 'express'
 import cors from 'cors'
 import { db } from './database/knex'
+import { userInfo } from 'os'
+import { ERROR } from 'sqlite3'
 
 const app = express()
 
@@ -10,6 +12,12 @@ app.use(express.json())
 app.listen(3003, () => {
     console.log(`Servidor rodando na porta ${3003}`)
 })
+
+
+
+
+
+
 
 app.get("/ping", async (req: Request, res: Response) => {
     try {
@@ -29,12 +37,16 @@ app.get("/ping", async (req: Request, res: Response) => {
     }
 })
 
+
+
+
+
+
+
+
 app.get("/bands", async (req: Request, res: Response) => {
     try {
-        const result = await db.raw(`
-            SELECT * FROM bands;
-        `)
-
+        const result = await db("bands")
         res.status(200).send(result)
     } catch (error) {
         console.log(error)
@@ -71,10 +83,26 @@ app.post("/bands", async (req: Request, res: Response) => {
             throw new Error("'id' e 'name' devem possuir no mínimo 1 caractere")
         }
 
-        await db.raw(`
-            INSERT INTO bands (id, name)
-            VALUES ("${id}", "${name}");
-        `)
+        // await db.raw(`
+        //     INSERT INTO bands (id, name)
+        //     VALUES ("${id}", "${name}");
+        // `)
+
+        // await db.insert({
+        //     id : id,
+        //     name: name,
+        // }).into("bands")
+
+
+
+        //boas praticas 
+
+        const newBands = {
+            id: id,
+            name: name
+        }
+
+        await db("bands").insert(newBands);
 
         res.status(200).send("Banda cadastrada com sucesso")
     } catch (error) {
@@ -125,20 +153,35 @@ app.put("/bands/:id", async (req: Request, res: Response) => {
             }
         }
 
-        const [ band ] = await db.raw(`
-            SELECT * FROM bands
-            WHERE id = "${idToEdit}";
-        `) // desestruturamos para encontrar o primeiro item do array
+        // const [ band ] = await db.raw(`
+        //     SELECT * FROM bands
+        //     WHERE id = "${idToEdit}";
+        // `) // desestruturamos para encontrar o primeiro item do array
+
+        const [band] = await db("bands").where({id: idToEdit})
+
+
 
         if (band) {
-            await db.raw(`
-                UPDATE bands
-                SET
-                    id = "${newId || band.id}",
-                    name = "${newName || band.name}"
-                WHERE
-                    id = "${idToEdit}";
-            `)
+            // await db.raw(`
+            //     UPDATE bands
+            //     SET
+            //         id = "${newId || band.id}",
+            //         name = "${newName || band.name}"
+            //     WHERE
+            //         id = "${idToEdit}";
+            // `)
+
+           const updateBand = {
+            id: newId || band.id,
+            name: newName || band.name
+           }
+
+           await db("bands").update(updateBand).where({id: idToEdit})
+
+
+
+
         } else {
             res.status(404)
             throw new Error("'id' não encontrada")
@@ -159,6 +202,44 @@ app.put("/bands/:id", async (req: Request, res: Response) => {
         }
     }
 })
+
+
+app.delete("/bands/:id"), async (req: Request, res: Response) => {
+    try {
+
+        const idToDelete = req.params.id
+
+        const [band] = await db("bands").where({id: idToDelete})
+
+        if(band){
+            await db("bands").del().where({id: idToDelete})
+
+        }else{
+            res.status(404)
+            throw new Error("Banda não encontrada")
+            
+        }
+
+        res.status(200).send("Banda apagada com sucesso")
+
+        
+    } catch (error: any) {
+
+        console.log(error)
+
+        if (req.statusCode === 200) {
+            res.status(500)
+        }
+
+        if (error instanceof Error) {
+            res.send(error.message)
+        } else {
+            res.send("Erro inesperado")
+        }
+        
+    }
+}
+
 
 app.get("/songs", async (req: Request, res: Response) => {
     try {
@@ -311,3 +392,4 @@ app.put("/songs/:id", async (req: Request, res: Response) => {
         }
     }
 })
+
